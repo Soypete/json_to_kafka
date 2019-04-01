@@ -1,9 +1,11 @@
 package consumer
 
 import (
+	"encoding/json"
 	"log"
 	"os"
 	"os/signal"
+	"time"
 
 	sarama "github.com/Shopify/sarama"
 )
@@ -14,18 +16,16 @@ func ConsumeMessage(brokers string, topic string, offset int64, partition int32)
 	if err != nil {
 		panic(err)
 	}
-
 	defer func() {
 		if err := consumer.Close(); err != nil {
 			log.Fatalln(err)
 		}
 	}()
-
 	partitionConsumer, err := consumer.ConsumePartition(topic, partition, offset)
 	if err != nil {
 		panic(err)
 	}
-
+	log.Println("consumer setup")
 	defer func() {
 		if err := partitionConsumer.Close(); err != nil {
 			log.Fatalln(err)
@@ -41,8 +41,13 @@ ConsumerLoop:
 	for {
 		select {
 		case msg := <-partitionConsumer.Messages():
-			log.Printf("Consumed message offset %d\n message:%v", msg.Offset, string(msg.Value))
+			encryptedMsg := msg.Value
+			//TODO: doesn't like string in the map
+			var objmap map[string]*json.RawMessage
+			str := json.Unmarshal(encryptedMsg, &objmap)
+			log.Printf("Consumed message offset %d\n message:%v", msg.Offset, str)
 			consumed++
+			time.Sleep(3 * time.Second)
 		case <-signals:
 			break ConsumerLoop
 		}
