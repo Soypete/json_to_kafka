@@ -1,7 +1,6 @@
 package producer
 
 import (
-	"encoding/json"
 	"log"
 	"os"
 	"os/signal"
@@ -11,23 +10,20 @@ import (
 )
 
 // PublishMessage sends messages to kafka.
-func PublishMessage(brokers string, topic string, jsonMessage string) {
+func PublishMessage(brokers string, topic string, msg []byte) {
 	config := sarama.NewConfig()
 	config.Producer.Return.Successes = true
 	producer, err := sarama.NewAsyncProducer([]string{brokers}, config)
 	if err != nil {
 		panic(err)
 	}
-
 	// Trap SIGINT to trigger a graceful shutdown.
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, os.Interrupt)
-
 	var (
 		wg                          sync.WaitGroup
 		enqueued, successes, errors int
 	)
-
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
@@ -35,7 +31,6 @@ func PublishMessage(brokers string, topic string, jsonMessage string) {
 			successes++
 		}
 	}()
-
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
@@ -44,12 +39,6 @@ func PublishMessage(brokers string, topic string, jsonMessage string) {
 			errors++
 		}
 	}()
-
-	msg, err := json.Marshal(jsonMessage)
-	if err != nil {
-		log.Print(err)
-	}
-
 ProducerLoop:
 	for {
 		message := &sarama.ProducerMessage{Topic: topic, Value: sarama.ByteEncoder(msg)}
@@ -61,8 +50,6 @@ ProducerLoop:
 			break ProducerLoop
 		}
 	}
-
 	wg.Wait()
-
 	log.Printf("Successfully produced: %d; errors: %d\n", successes, errors)
 }

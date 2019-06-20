@@ -31,19 +31,16 @@ func ConsumeMessage(brokers string, topic string, offset int64, partition int32)
 			log.Fatalln(err)
 		}
 	}()
-
 	// Trap SIGINT to trigger a shutdown.
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, os.Interrupt)
-
 	consumed := 0
 ConsumerLoop:
 	for {
 		select {
 		case msg := <-partitionConsumer.Messages():
 			encryptedMsg := msg.Value
-			//TODO: doesn't like string in the map
-			var objmap map[string]*json.RawMessage
+			var objmap map[string]interface{}
 			str := json.Unmarshal(encryptedMsg, &objmap)
 			log.Printf("Consumed message offset %d\n message:%v", msg.Offset, str)
 			consumed++

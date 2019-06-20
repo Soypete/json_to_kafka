@@ -5,6 +5,7 @@ import (
 	"crypto/rsa"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"log"
 
 	"github.com/Soypete/json_to_kafka/consumer"
@@ -13,7 +14,7 @@ import (
 )
 
 var (
-	jsonMessage = `{"data":{"name":"pete","job":"data munger", "death":"cloudevents"}}`
+	jsonMessage = map[string]interface{}{"name": "pete", "job": "data munger", "death": "json encoding"}
 )
 
 func main() {
@@ -29,28 +30,34 @@ func main() {
 		log.Println("consuming from kafka")
 		consumer.ConsumeMessage(*brokers, *topic, int64(*offset), int32(*partition))
 	} else {
-		// ctx := context.Background()
 		privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 		if err != nil {
 			panic(err)
 		}
 		pubKey := &privateKey.PublicKey
-		// key := jose.JSONWebKey{
-		// 	Algorithm: "RSA_OAEP",
-		// 	Key:       pubKey,
-		// }
 		encrypter, err := jose.NewEncrypter(jose.A128GCM, jose.Recipient{Algorithm: jose.RSA_OAEP, Key: pubKey}, nil)
 		if err != nil {
 			panic(err)
 		}
+		for k, v := range jsonMessage {
+			switch vv := v.(type) {
+			case string:
+				fmt.Println(k, "is string", vv)
+				encr, err := encrypter.Encrypt([]byte(vv))
+				if err != nil {
+					panic(err)
+				}
+				jsonMessage[k] = encr
+			case []interface{}:
+				fmt.Println(k, "is an array:")
+				for i, u := range vv {
+					fmt.Println(i, u)
+				}
+			default:
+				fmt.Println(k, "is of a type I don't know how to handle")
+			}
+		}
 		msg, err := json.Marshal(jsonMessage)
-		encrMsg, err := encrypter.Encrypt(msg)
-		// encrMsg, err := encrypt.JWE(ctx, key, msg)
-		// if err != nil {
-		// 	panic(err)
-		// }
-		serilazedMsg := encrMsg.FullSerialize()
-		str := &serilazedMsg
-		producer.PublishMessage(*brokers, *topic, *str)
+		producer.PublishMessage(*brokers, *topic, msg)
 	}
 }
